@@ -5,7 +5,7 @@ import {
   getTodoById,
   updateTodo,
   deleteTodo,
-} from "../controllers/todoController.js";
+} from "../controller/todoController.js";
 import authMiddleware from "../middlewares/authMiddleware.js";
 import upload from "../middlewares/uploadMiddleware.js";
 

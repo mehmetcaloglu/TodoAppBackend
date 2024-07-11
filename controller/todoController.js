@@ -6,7 +6,7 @@ export const createTodo = async (req, res) => {
   const filePath = req.files.file ? req.files.file[0].path : null;
   try {
     const todo = new todoModel({
-      user: req.user, // Giriş yapan kullanıcının ID'si
+      user: req.user,
       title,
       description,
       tags: tags ? tags.split(",").map((tag) => tag.trim()) : [],
@@ -20,26 +20,53 @@ export const createTodo = async (req, res) => {
   }
 };
 
+
 export const getTodos = async (req, res) => {
-  const { tag, search } = req.query;
+  const { tag, page = 1 } = req.query;
+  const pageSize = 10;
+  const skip = (page - 1) * pageSize;
+
+  const baseUrl = `${req.protocol}:/${req.get('host')}`;
+
   try {
     let query = { user: req.user };
 
     if (tag) {
-      query.tags = tag;
+      query.tags = { $regex: tag, $options: 'i' };
     }
 
-    if (search) {
-      query.$or = [
-        { title: { $regex: search, $options: "i" } },
-        { description: { $regex: search, $options: "i" } },
-      ];
-    }
+    const totalTodos = await todoModel.countDocuments(query);
+    const todos = await todoModel.find(query)
+      .skip(skip)
+      .limit(pageSize)
+      .lean();
 
-    const todos = await todoModel.find(query);
-    res.json(todos);
+    const normalizePath = (filePath) => filePath.replace(/\\/g, '/');
+
+
+    todos.forEach(todo => {
+      if (todo.imagePath) {
+        todo.imageUrl = normalizePath(`${baseUrl}/${todo.imagePath}`);
+
+      }
+      if (todo.filePath) {
+        todo.fileUrl = normalizePath(`${baseUrl}/${todo.filePath}`);
+      }
+      // send filename too
+      if (todo.filePath) {
+        todo.fileName = todo.filePath.split('\\').pop();
+      }
+    });
+
+    res.json({
+      todos,
+      totalTodos,
+      currentPage: parseInt(page, 10),
+      totalPages: Math.ceil(totalTodos / pageSize)
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    console.error('Error fetching todos:', err);
+    res.status(500).json({ error: 'Failed to fetch todos' });
   }
 };
 
@@ -85,7 +112,7 @@ export const deleteTodo = async (req, res) => {
     if (!todo) {
       return res.status(404).json({ message: "Todo not found" });
     }
-    await todo.remove();
+    await todoModel.deleteOne({ _id: req.params.id, user: req.user });
     res.json({ message: "Todo removed" });
   } catch (err) {
     res.status(500).json({ error: err.message });
