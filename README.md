@@ -1,4 +1,4 @@
-you have download en setup mongodb first
+you have download and setup mongodb first
 
 and you have to create db that name todoapp
 
